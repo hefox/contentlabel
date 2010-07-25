@@ -31,24 +31,40 @@ function contentlabel_form_alter(&$form, $form_state, $form_id) {
     $type = $form['#node_type']->type;
     foreach($options as $key => $title) {
       $form['contentlabel']['modes']['contentlabel_mode_' . $key] = array(
-        '#type' => 'radios',
+        '#type' => 'checkboxes',
+        '#multiple' => TRUE,
         '#title' => $title,
-        '#default_value' => variable_get('contentlabel_mode_' . $key . '_' . $type, ''),
+        '#default_value' => variable_get('contentlabel_mode_' . $key . '_' . $type, array()),
         '#options' => array(
           'inline' => t('Display before title'),
           'variable' => t('Provide as a variable'),
-          '' => t('None'),
+          'page' => t('Add onto page title'),
         ),
         '#attributes' => array(
           'class' => 'contentlabel-form-item',
         ),
       );
     }
-    $form['contentlabel']['contentlabel_separator'] = array(
+    $form['contentlabel']['contentlabel_prefix'] = array(
       '#type' => 'textfield',
-      '#title' => t('Separator for next to node title'),
-      '#default_value' =>  variable_get('contentlabel_separator_' . $type, ' '),
+      '#title' => t('Prefix'),
+      '#default_value' =>  variable_get('contentlabel_prefix_' . $type, ' '),
     );
+    $form['contentlabel']['contentlabel_suffix'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Suffix'),
+      '#default_value' =>  variable_get('contentlabel_suffix_' . $type, ''),
+    );
+    $form['contentlabel']['contentlabel_position'] = array(
+      '#type' => 'radios',
+      '#title' => t('Position'),
+      '#default_value' =>  variable_get('contentlabel_position_' . $type, 'before'),
+      '#options' => array(
+        'before' => t('Before'),
+        'after' => t('After'),
+      ),
+    );
+
   }
 }
 
@@ -75,12 +91,29 @@ function contentlabel_preprocess_node(&$vars) {
   else {
     $context = $vars['node']->build_mode;
   }
-  switch (variable_get('contentlabel_mode_' . $context . '_' . $vars['node']->type, '')) {
-    case 'variable':
-      $vars['type_label'] = check_plain(node_get_types('name', $vars['node']->type));
-      break;
-    case 'inline':
-      $vars['title'] = check_plain(node_get_types('name', $vars['node']->type) . variable_get('contentlabel_separator_' . $vars['node']->type, ' ')) . $vars['title'];
-      break;
+  $title = filter_xss(variable_get('contentlabel_prefix_' . $vars['node']->type, ' ')) 
+    . check_plain(node_get_types('name', $vars['node']->type)) 
+    . filter_xss(variable_get('contentlabel_suffix_' . $vars['node']->type, ''));
+  if (variable_get('contentlabel_position_' . $vars['node']->type, 'before') == 'before') {
+    $title .= check_plain($vars['node']->title);
+  }
+  else {
+    $title = check_plain($vars['node']->title) . $title;
+  }
+  
+  $settings = variable_get('contentlabel_mode_' . $context . '_' . $vars['node']->type, array());
+  if (in_array('variable', $settings)) {
+      $vars['type_label'] = $title;
+  }
+  if (in_array('inline', $settings)) {
+    $vars['title'] = $title;
+  }
+  $node_object = menu_get_object();
+  if (!empty($node_object->nid)
+    && $node_object->nid == $vars['node']->nid
+    && in_array('page', $settings)
+    && $vars['page'])
+    {
+    drupal_set_title($title);
   }
 }
