@@ -1,0 +1,3 @@
+name = Content Label
+description = Appends content type label to title or provide it as a label 
+core = 6.x

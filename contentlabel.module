@@ -1,0 +1,86 @@
+<?php
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function contentlabel_form_alter(&$form, $form_state, $form_id) {
+  if (isset($form['#node_type']) && 'node_type_form' == $form_id) {
+    drupal_add_css(drupal_get_path('module', 'contentlabel') . '/contentlabel.css');
+    $form['contentlabel'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Content Label'),
+      '#weight' => 0,
+      '#collapsible' => TRUE,
+      '#attributes' => array(
+        'class' => 'contentlabel-fieldset'
+      ),
+    );
+
+    if ($modes = module_invoke('content', 'build_modes')) {
+      $options = array();
+      foreach ($modes as $key => $value) {
+        $options[$key] = $value['title'];
+      }
+    }
+    else {
+      $options = array(
+        'teaser' => t('Teaser'),
+        'full' => t('Full node')
+      );
+    }
+    $type = $form['#node_type']->type;
+    foreach($options as $key => $title) {
+      $form['contentlabel']['modes']['contentlabel_mode_' . $key] = array(
+        '#type' => 'radios',
+        '#title' => $title,
+        '#default_value' => variable_get('contentlabel_mode_' . $key . '_' . $type, ''),
+        '#options' => array(
+          'inline' => t('Display before title'),
+          'variable' => t('Provide as a variable'),
+          '' => t('None'),
+        ),
+        '#attributes' => array(
+          'class' => 'contentlabel-form-item',
+        ),
+      );
+    }
+    $form['contentlabel']['contentlabel_separator'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Separator for next to node title'),
+      '#default_value' =>  variable_get('contentlabel_separator_' . $type, ' '),
+    );
+  }
+}
+
+/**
+ * Implementation of hook_node_type().
+ */
+function contentlabel_node_type($op, $info) {
+  switch ($op) {
+    case 'delete':
+      db_query("DELETE * from variable where name like 'contentlabel_%%_%s'", $info->type);
+      variable_del('contentlabel_separator_'. $info->type);
+      break;
+  }
+}
+
+
+/**
+ * Implementation of hook_preprocess_node().
+ */
+function contentlabel_preprocess_node(&$vars) {
+  if ($vars['node']->build_mode === NODE_BUILD_NORMAL || $vars['node']->build_mode == NODE_BUILD_PREVIEW) {
+    $context = $vars['teaser'] ? 'teaser' : 'full';
+  }
+  else {
+    $context = $vars['node']->build_mode;
+  }
+  switch (variable_get('contentlabel_mode_' . $context . '_' . $vars['node']->type, '')) {
+    case 'variable':
+      $vars['type_label'] = check_plain(node_get_types('name', $vars['node']->type));
+      break;
+    case 'inline':
+      $vars['title'] = check_plain(node_get_types('name', $vars['node']->type) . variable_get('contentlabel_separator_' . $vars['node']->type, ' ')) . $vars['title'];
+      break;
+  }
+}

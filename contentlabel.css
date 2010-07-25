@@ -1,0 +1,8 @@
+.contentlabel-fieldset .form-item {
+  clear: both;
+}
+.contentlabel-fieldset .form-radios .form-item {
+  float: left;
+  width: 220px;
+  clear: none;
+}
